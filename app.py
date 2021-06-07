@@ -79,5 +79,35 @@ def product_handler_id(id_):
         return method_not_allowed()
 
 
+@app.route("/item", methods=["GET", "POST"])
+def item_handler():
+    if request.method == "GET":
+        return json.dumps({"success": True, "code": 200, "message": "OK", "products": database.Items.to_list()})
+    elif request.method == "POST":
+        database.NewItem(**request.form)
+        return ok()
+    else:
+        return method_not_allowed()
+
+
+@app.route("/item/<id_>", methods=["GET", "PATCH", "DELETE"])
+def item_handler_id(id_):
+    item = database.Item.from_id(id_)
+    
+    if not item:
+        return not_found()
+
+    if request.method == "GET":
+        return json.dumps({"success": True, "code": 200, "message": "OK", "product": item.to_dict()})
+    elif request.method == "PATCH":
+        item.patch(**request.form)
+        item.update()
+        return ok()
+    elif request.method == "DELETE":
+        item.remove()
+        return ok()
+    else:
+        return method_not_allowed()
+
 if __name__ == '__main__':
     app.run()

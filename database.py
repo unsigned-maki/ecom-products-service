@@ -7,6 +7,7 @@ client = pymongo.MongoClient(os.getenv("MONGO_DB"))
 database = client["Ecom"]
 categories = database["categories"]
 products = database["products"]
+items = database["items"]
 
 
 class Category:
@@ -219,4 +220,83 @@ class Products:
     @staticmethod
     def serialize():
         return json.dumps(Products.to_list())
+
+
+class Item:
+
+    def __init__(self, **kwargs):
+        self.__id = kwargs.get("id", generate_uid())
+        self.id = self.__id
+        self.product = kwargs.get("product", "Unknown")
+        self.used = kwargs.get("used", False)
+        self.content = kwargs.get("content", "None")
+
+    @staticmethod
+    def from_id(id_):
+        result = items.find({"id": id_})
+
+        if result.count() > 0:
+            return CursorItem(result[0])
+
+        return False
+
+    def patch(self, **kwargs):
+        self.product = kwargs.get("product", self.product)
+        self.used = kwargs.get("used", self.used)
+        self.content = kwargs.get("content", self.content)
+
+    def to_dict(self):
+        return {"id": self.__id,
+                "product": self.product,
+                "used": self.used,
+                "content": self.content}
+
+    def serialize(self):
+        return json.dumps(self.to_dict)
+
+
+class CursorItem(Item):
+
+    def __init__(self, cursor: pymongo.cursor.Cursor):
+        super().__init__(id=cursor["id"],
+                         product=cursor["product"],
+                         used=cursor["used"],
+                         content=cursor["content"])
+
+    def update(self):
+        items.update_many({"id": self.id}, {"$set": {"product": self.product,
+                                                        "used": self.used,
+                                                         "content": self.content}})
+
+    def remove(self):
+        items.delete_many({"id": self.id})
+
+
+class NewItem(CursorItem):
+
+    def __init__(self, **kwargs):
+        uid = generate_uid()
+
+        items.insert_one({"id": uid,
+                             "product": kwargs.get("product", "Unknown"),
+                             "used": kwargs.get("used", False),
+                             "content": kwargs.get("content", "None")})
+
+        super().__init__(items.find_one({"id": uid}))
+
+
+class Items:
+
+    @staticmethod
+    def to_list():
+        item_list = list()
+
+        for item in items.find():
+            item_list.append(CursorItem(item).to_dict())
+
+        return item_list
+
+    @staticmethod
+    def serialize():
+        return json.dumps(Items.to_list())
 
